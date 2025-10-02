@@ -23,7 +23,7 @@ class Sda(DisclosureAttack):
 
         freqs = receivers_target.sum(axis=0)
         noise = np.full(freqs.size, 1/freqs.size)
-        target_prop = freqs / freqs.size - (batch_size - 1)*noise
+        target_prop = freqs / freqs.size - (batch_size - 1) * noise
         return target_prop
 
 
@@ -76,8 +76,8 @@ class SdaSn(DisclosureAttack):
     """
 
     def _execute_targeted(self, senders: ndarray, receivers: ndarray,
-                        senders_target: ndarray, receivers_target: ndarray,
-                        target_user: int) -> ndarray:
+                          senders_target: ndarray, receivers_target: ndarray,
+                          target_user: int) -> ndarray:
 
         n_receivers = receivers_target.shape[1]
         # Determine the batch_size (total messages per round)
@@ -87,31 +87,42 @@ class SdaSn(DisclosureAttack):
 
         # Total messages sent by each sender across targeted rounds
         total_senders = senders_target.sum(axis=0)
-        
-        weights_cosender = total_senders
-        weights_cosender[target_user] = 0
-        weights_cosender = weights_cosender / weights_cosender.sum()
 
         sender_indices = np.nonzero(total_senders > 0)[0]
         cosenders = sender_indices[sender_indices != target_user]
-        behaviors_cosender = np.zeros((weights_cosender.size, n_receivers))
-        behaviors_cosender[cosenders] = np.asarray([
-            get_cosender_behavior(senders, receivers, cosender)
-            for cosender in cosenders
-        ])
-        weights_cosender = np.expand_dims(weights_cosender, 0)
-        noise = np.matmul(weights_cosender, behaviors_cosender).squeeze()
 
-        target_prop = freqs / freqs.size - (batch_size - 1)*noise
+        if cosenders.size > 0:
+            # Weights for cosenders (exclude target)
+            weights_cosender = total_senders.astype(float).copy()
+            weights_cosender[target_user] = 0
+            weights_cosender = weights_cosender / weights_cosender.sum()
+
+            behaviors_cosender = np.zeros((weights_cosender.size, n_receivers))
+            behaviors_cosender[cosenders] = np.asarray([
+                get_cosender_behavior(senders, receivers, cosender)
+                for cosender in cosenders
+            ])
+            weights_cosender = np.expand_dims(weights_cosender, 0)
+            noise = np.matmul(weights_cosender, behaviors_cosender).squeeze()
+        else:
+            # No cosender activity -> noise is zero vector
+            noise = np.zeros(n_receivers, dtype=float)
+
+        target_prop = freqs / freqs.size - (batch_size - 1) * noise
         return target_prop
 
 
 def get_cosender_behavior(senders: ndarray, receivers: ndarray, cosender: int):
     senders_target, receivers_target = targeted_rounds(senders, receivers, cosender)
+    if senders_target.size == 0:
+        # No rounds where cosender sent
+        return np.zeros(receivers.shape[1], dtype=float)
+
     target_counts = senders_target[:, cosender]  # shape: (n_rounds,)
 
     # Weight the receiver counts by how many times the cosender sent messages in that round
     # Each row of receivers_target is multiplied by the corresponding count in target_counts
-    receivers_target = receivers_target * target_counts[:, np.newaxis]
-    target_prop = receivers_target.sum(axis=0)
+    weighted_receivers = receivers_target * target_counts[:, np.newaxis]
+
+    target_prop = weighted_receivers .sum(axis=0)
     return target_prop / target_prop.sum()

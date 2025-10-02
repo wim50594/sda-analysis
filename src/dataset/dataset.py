@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 from numpy import ndarray
@@ -25,10 +25,17 @@ class Dataset:
     transition_matrix: ndarray
     senders: ndarray
     receivers: ndarray
+    n_user: tuple[int, int] = field(init=False)
+    n_observations: int = field(init=False)
+    batch_size: int = field(init=False)
 
     def __post_init__(self):
         self._validate()
         self.transition_matrix = zero_unobserved_senders(self.transition_matrix, self.senders)
+
+        self.n_user = self.transition_matrix.shape[0], self.transition_matrix.shape[1]
+        self.n_observations = len(self.senders)
+        self.batch_size = self.senders[0].sum()
 
     def _validate(self):
         assert all(arr.ndim == 2 for arr in (self.transition_matrix, self.senders, self.receivers)), \
@@ -111,6 +118,9 @@ class Dataset:
             senders=self.senders[idx],
             receivers=self.receivers[idx],
         )
+    
+    def describe(self):
+        return f"n_user={self.n_user}, n_observations={self.n_observations}, batch_size={self.batch_size}"
     
     @classmethod
     def from_batched(cls, transition_matrix: ndarray, senders: ndarray,

@@ -62,7 +62,7 @@ def run_experiments(dataset: Dataset, attacks: Iterable[AttackBase] | AttackBase
             
                 # 3. Collect repeat results
                 repeat_results.append({
-                    'observations': t,
+                    'observations': len(dataset_sample.senders),
                     'attack': attack_name,
                     'runtime(s)': runtime_seconds,
                     **metrics_mean.to_dict()

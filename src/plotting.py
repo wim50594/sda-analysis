@@ -10,7 +10,7 @@ def plot_evaluation_results(results_df: pd.DataFrame,
                             metrics_idx: list[int] | None = None,
                             ncols: int = 3,
                             simple_names: bool = True,
-                            logy: bool | list[int] = False):
+                            logy: bool | int | list[int] = False):
     """
     Plots the different evaluation metrics over increasing observation rounds.
     
@@ -59,11 +59,14 @@ def plot_evaluation_results(results_df: pd.DataFrame,
     for i in range(len(metric_cols) + 1, len(axes)):
         fig.delaxes(axes[i])
 
-    if logy:
+    if logy is not False:
         if isinstance(logy, bool):
-            logy = list(range(n_metrics))
+            logy = list(range(n_metrics))  # all metrics
+        elif isinstance(logy, int):
+            logy = [logy]
         for i in logy:
-            axes[i].set_yscale('log')
+            if 0 <= i < n_metrics:
+                axes[i].set_yscale('log')
 
     plt.tight_layout()
     
